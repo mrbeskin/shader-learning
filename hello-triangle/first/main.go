@@ -55,7 +55,6 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	//glfw.WindowHint(glfw.Resizable, glfw.False)
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
@@ -78,7 +77,7 @@ func main() {
 	gl.UseProgram(program)
 
 	var VAO uint32
-	var VBO uint32
+	var VBO uint32 // vertex buffer object
 	gl.GenVertexArrays(1, &VAO)
 	gl.GenBuffers(1, &VBO)
 
