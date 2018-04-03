@@ -22,24 +22,6 @@ const (
 	sizeof_float32 = 4
 )
 
-// A simple vertex shader
-var vertexShaderSource = `
-#version 330 core
-layout (location = 0) in vec3 aPos;
-void main() {
-    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-}
-` + "\x00"
-
-// A simple fragment shader
-var fragmentShaderSource = `
-#version 330 core
-out vec4 FragColor;
-void main() {
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-} 
-` + "\x00"
-
 var vertices = []float32{
 	// indexed to be an EBO
 	0.5, 0.5, 0.0, // top right
@@ -59,6 +41,9 @@ func init() {
 }
 
 func main() {
+
+	vertexShaderSource, _ := readShaderFile("shader.vert")
+	fragmentShaderSource, _ := readShaderFile("shader.frag")
 
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
@@ -83,7 +68,7 @@ func main() {
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
-	program := setupProgram()
+	program := setupProgram(vertexShaderSource, fragmentShaderSource)
 	gl.UseProgram(program)
 
 	var VAO uint32
@@ -128,7 +113,7 @@ func main() {
 func destroyScene() {
 }
 
-func setupProgram() uint32 {
+func setupProgram(vertexShaderSource string, fragmentShaderSource string) uint32 {
 	// vertex shader
 	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
