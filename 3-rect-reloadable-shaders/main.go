@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"go/build"
 	_ "image/png"
+	"io/ioutil"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 
@@ -183,7 +186,7 @@ func fbcallback(w *glfw.Window, width int, height int) {
 }
 
 func init() {
-	data, err := importPathToDir("github.com/mrbeskin/shader-learning/reloadable-shaders")
+	dir, err := importPathToDir("github.com/mrbeskin/shader-learning/3-rect-reloadable-shaders")
 	if err != nil {
 		log.Fatalln("could not locate assets on GOPATH:", err)
 	}
@@ -199,4 +202,14 @@ func importPathToDir(importPath string) (string, error) {
 		return "", err
 	}
 	return p.Dir, nil
+}
+
+// reads a shader from a file and returns a string representation
+// that is usable in opengl programs
+func readShaderFile(shaderPath string) (string, error) {
+	shaderBuf, err := ioutil.ReadFile(shaderPath)
+	if err != nil {
+		log.Fatalf("shader %q unable to be read: %v", shaderPath, err)
+	}
+	return string(shaderBuf), nil
 }
