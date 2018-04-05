@@ -42,9 +42,6 @@ func init() {
 
 func main() {
 
-	vertexShaderSource, _ := readShaderFile("shader.vert")
-	fragmentShaderSource, _ := readShaderFile("shader.frag")
-
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
 	}
@@ -65,15 +62,16 @@ func main() {
 		panic(err)
 	}
 
+	vertexShaderSource, err := readShaderFile("shader.vert")
+	fragmentShaderSource, err := readShaderFile("shader.frag")
+
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
 	program := setupProgram(vertexShaderSource, fragmentShaderSource)
 	gl.UseProgram(program)
 
-	var VAO uint32
-	var EBO uint32
-	var VBO uint32
+	var VAO, EBO, VBO uint32
 
 	gl.GenVertexArrays(1, &VAO)
 	gl.GenBuffers(1, &VBO)
@@ -81,25 +79,39 @@ func main() {
 
 	// bind Vertex Array first
 	gl.BindVertexArray(VAO)
-
 	gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*sizeof_float32, gl.Ptr(vertices), gl.STATIC_DRAW)
-
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*sizeof_float32, gl.Ptr(indices), gl.STATIC_DRAW)
-
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 3*sizeof_float32, gl.PtrOffset(0))
 	gl.EnableVertexAttribArray(0)
-
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.BindVertexArray(0)
-
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
 
 	// render loop
 	for !window.ShouldClose() {
+		reload := false
 
+		newVertexShaderSource, err := readShaderFile("shader.vert")
+		if err != nil {
+			log.Printf("vertex shader invalid: %v", err)
+		} else {
+			vertexShaderSource = newVertexShaderSource
+			reload = true
+		}
+
+		newFragmentShaderSource, err := readShaderFile("shader.frag")
+		if err != nil {
+			log.Printf("fragment shader invalid: %v", err)
+		} else {
+			fragmentShaderSource = newFragmentShaderSource
+			reload = true
+		}
+		if reload {
+			program = setupProgram(vertexShaderSource, fragmentShaderSource)
+		}
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 		gl.UseProgram(program)
 		gl.BindVertexArray(VAO)
@@ -111,6 +123,7 @@ func main() {
 }
 
 func destroyScene() {
+	gl.Flush()
 }
 
 func setupProgram(vertexShaderSource string, fragmentShaderSource string) uint32 {
@@ -156,10 +169,8 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	if status == gl.FALSE {
 		var logLength int32
 		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
-
 		log := strings.Repeat("\x00", int(logLength+1))
 		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
-
 		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
 	}
 	free()
@@ -194,7 +205,7 @@ func importPathToDir(importPath string) (string, error) {
 func readShaderFile(shaderPath string) (string, error) {
 	shaderBuf, err := ioutil.ReadFile(shaderPath)
 	if err != nil {
-		log.Fatalf("shader %q unable to be read: %v", shaderPath, err)
+		return "", fmt.Errorf("shader %q unable to be read: %v", shaderPath, err)
 	}
 	return string(shaderBuf), nil
 }
