@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	defer func() { destroyScene() }()
 	game := InitializeProgramWithWindow(vertexShaderSource, fragmentShaderSource)
 
 	game.InitBuffers()
