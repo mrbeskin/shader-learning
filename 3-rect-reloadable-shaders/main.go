@@ -22,6 +22,29 @@ const (
 	sizeof_float32 = 4
 )
 
+func init() {
+	// GLFW event handling must run on the main OS thread
+	runtime.LockOSThread()
+}
+
+func main() {
+
+	vertexShaderSource, err := readShaderFile("shader.vert")
+	if err != nil {
+		panic(err)
+	}
+	fragmentShaderSource, err := readShaderFile("shader.frag")
+	if err != nil {
+		panic(err)
+	}
+	game := InitializeProgramWithWindow(vertexShaderSource, fragmentShaderSource)
+
+	game.InitBuffers()
+
+	game.Loop()
+
+}
+
 var vertices = []float32{
 	// indexed to be an EBO
 	0.5, 0.5, 0.0, // top right
@@ -35,17 +58,62 @@ var indices = []uint32{
 	1, 2, 3,
 }
 
-func init() {
-	// GLFW event handling must run on the main OS thread
-	runtime.LockOSThread()
+func destroyScene() {
+	defer glfw.Terminate()
+	gl.Flush()
 }
 
-func main() {
+type Program struct {
+	glProgram  uint32
+	glfwWindow *glfw.Window
+	glVao      uint32
+}
 
+func (p *Program) setProgram(program uint32) {
+	p.glProgram = program
+}
+
+func (p *Program) setWindow(window *glfw.Window) {
+	p.glfwWindow = window
+}
+
+func (p *Program) Loop() {
+	for !(p.glfwWindow.ShouldClose()) {
+		reload := false
+
+		newVertexShaderSource, err := readShaderFile("shader.vert")
+		if err != nil {
+			log.Printf("vertex shader invalid: %v", err)
+		} else {
+			reload = true
+		}
+
+		newFragmentShaderSource, err := readShaderFile("shader.frag")
+		if err != nil {
+			log.Printf("fragment shader invalid: %v", err)
+		} else {
+			reload = true
+		}
+		if reload {
+			p.glProgram = setupProgram(newVertexShaderSource, newFragmentShaderSource)
+		}
+		gl.Clear(gl.COLOR_BUFFER_BIT)
+		gl.UseProgram(p.glProgram)
+		gl.BindVertexArray(p.glVao)
+		gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.PtrOffset(0))
+		gl.BindVertexArray(0)
+		p.glfwWindow.SwapBuffers()
+		glfw.PollEvents()
+	}
+}
+
+// Creates a window from the passed in shaders
+// TODO: initial configuration passed into something like this
+func InitializeProgramWithWindow(vertexShaderSource string, fragmentShaderSource string) *Program {
+	// initialize glfw window
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
 	}
-	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 2)
@@ -62,15 +130,19 @@ func main() {
 		panic(err)
 	}
 
-	vertexShaderSource, err := readShaderFile("shader.vert")
-	fragmentShaderSource, err := readShaderFile("shader.frag")
-
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
 	program := setupProgram(vertexShaderSource, fragmentShaderSource)
 	gl.UseProgram(program)
 
+	return &Program{
+		glProgram:  program,
+		glfwWindow: window,
+	}
+}
+
+func (p *Program) InitBuffers() {
 	var VAO, EBO, VBO uint32
 
 	gl.GenVertexArrays(1, &VAO)
@@ -89,41 +161,7 @@ func main() {
 
 	gl.BindVertexArray(0)
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
-
-	// render loop
-	for !window.ShouldClose() {
-		reload := false
-
-		newVertexShaderSource, err := readShaderFile("shader.vert")
-		if err != nil {
-			log.Printf("vertex shader invalid: %v", err)
-		} else {
-			vertexShaderSource = newVertexShaderSource
-			reload = true
-		}
-
-		newFragmentShaderSource, err := readShaderFile("shader.frag")
-		if err != nil {
-			log.Printf("fragment shader invalid: %v", err)
-		} else {
-			fragmentShaderSource = newFragmentShaderSource
-			reload = true
-		}
-		if reload {
-			program = setupProgram(vertexShaderSource, fragmentShaderSource)
-		}
-		gl.Clear(gl.COLOR_BUFFER_BIT)
-		gl.UseProgram(program)
-		gl.BindVertexArray(VAO)
-		gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.PtrOffset(0))
-		gl.BindVertexArray(0)
-		window.SwapBuffers()
-		glfw.PollEvents()
-	}
-}
-
-func destroyScene() {
-	gl.Flush()
+	p.glVao = VAO
 }
 
 func setupProgram(vertexShaderSource string, fragmentShaderSource string) uint32 {
