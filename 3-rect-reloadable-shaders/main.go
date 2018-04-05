@@ -37,6 +37,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	game := InitializeProgramWithWindow(vertexShaderSource, fragmentShaderSource)
 
 	game.InitBuffers()
@@ -79,24 +80,7 @@ func (p *Program) setWindow(window *glfw.Window) {
 
 func (p *Program) Loop() {
 	for !(p.glfwWindow.ShouldClose()) {
-		reload := false
-
-		newVertexShaderSource, err := readShaderFile("shader.vert")
-		if err != nil {
-			log.Printf("vertex shader invalid: %v", err)
-		} else {
-			reload = true
-		}
-
-		newFragmentShaderSource, err := readShaderFile("shader.frag")
-		if err != nil {
-			log.Printf("fragment shader invalid: %v", err)
-		} else {
-			reload = true
-		}
-		if reload {
-			p.glProgram = setupProgram(newVertexShaderSource, newFragmentShaderSource)
-		}
+		p.ReloadShaders()
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 		gl.UseProgram(p.glProgram)
 		gl.BindVertexArray(p.glVao)
@@ -104,6 +88,27 @@ func (p *Program) Loop() {
 		gl.BindVertexArray(0)
 		p.glfwWindow.SwapBuffers()
 		glfw.PollEvents()
+	}
+}
+
+func (p *Program) ReloadShaders() {
+	reload := false
+	newVertexShaderSource, err := readShaderFile("shader.vert")
+	if err != nil {
+		log.Printf("vertex shader invalid: %v", err)
+	} else {
+		reload = true
+	}
+
+	newFragmentShaderSource, err := readShaderFile("shader.frag")
+	if err != nil {
+		log.Printf("fragment shader invalid: %v", err)
+	} else {
+		reload = true
+	}
+	if reload {
+		gl.Flush()
+		p.glProgram = setupProgram(newVertexShaderSource, newFragmentShaderSource)
 	}
 }
 
