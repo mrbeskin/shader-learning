@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -29,18 +30,15 @@ func init() {
 
 func main() {
 
-	vertexShaderSource, err := readShaderFile("shader.vert")
-	if err != nil {
-		panic(err)
-	}
-	fragmentShaderSource, err := readShaderFile("shader.frag")
-	if err != nil {
-		panic(err)
-	}
-	defer func() { destroyScene() }()
-	game := InitializeProgramWithWindow(vertexShaderSource, fragmentShaderSource)
+	initializeGlfwWindow()
 
-	game.InitBuffers()
+	shaders := NewShaders("shader.vert", "shader.frag")
+	program := NewProgram(shaders)
+	defer func() { destroyScene() }()
+
+	game := InitializeProgramWithWindow()
+
+	initBuffers()
 
 	game.Loop()
 
@@ -68,14 +66,17 @@ type Program struct {
 	glProgram  uint32
 	glfwWindow *glfw.Window
 	glVao      uint32
+	shaders    *Shaders
 }
 
-func (p *Program) setProgram(program uint32) {
-	p.glProgram = program
+type Shaders struct {
+	frag Shader
+	vert Shader
 }
 
-func (p *Program) setWindow(window *glfw.Window) {
-	p.glfwWindow = window
+type Shader struct {
+	Modtime time.Time
+	path    string
 }
 
 func (p *Program) Loop() {
@@ -91,30 +92,7 @@ func (p *Program) Loop() {
 	}
 }
 
-func (p *Program) ReloadShaders() {
-	reload := false
-	newVertexShaderSource, err := readShaderFile("shader.vert")
-	if err != nil {
-		log.Printf("vertex shader invalid: %v", err)
-	} else {
-		reload = true
-	}
-
-	newFragmentShaderSource, err := readShaderFile("shader.frag")
-	if err != nil {
-		log.Printf("fragment shader invalid: %v", err)
-	} else {
-		reload = true
-	}
-	if reload {
-		gl.Flush()
-		p.glProgram = setupProgram(newVertexShaderSource, newFragmentShaderSource)
-	}
-}
-
-// Creates a window from the passed in shaders
-// TODO: initial configuration passed into something like this
-func InitializeProgramWithWindow(vertexShaderSource string, fragmentShaderSource string) *Program {
+func intializeGlfwWindow() {
 	// initialize glfw window
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
@@ -130,6 +108,10 @@ func InitializeProgramWithWindow(vertexShaderSource string, fragmentShaderSource
 	}
 	window.MakeContextCurrent()
 	window.SetFramebufferSizeCallback(glfw.FramebufferSizeCallback(fbcallback))
+}
+
+func InitializeProgramWithWindow() *Program {
+
 	// init Glow
 	if err := gl.Init(); err != nil {
 		panic(err)
@@ -138,17 +120,11 @@ func InitializeProgramWithWindow(vertexShaderSource string, fragmentShaderSource
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
-	program := setupProgram(vertexShaderSource, fragmentShaderSource)
+	program := setupProgram(shaders)
 	gl.UseProgram(program)
-
-	return &Program{
-		glProgram:  program,
-		glfwWindow: window,
-	}
 }
 
-func (p *Program) InitBuffers() {
-	var VAO, EBO, VBO uint32
+func initBuffers() (VAO uint32, EBO uint32, VBO uint32) {
 
 	gl.GenVertexArrays(1, &VAO)
 	gl.GenBuffers(1, &VBO)
@@ -166,58 +142,7 @@ func (p *Program) InitBuffers() {
 
 	gl.BindVertexArray(0)
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
-	p.glVao = VAO
-}
-
-func setupProgram(vertexShaderSource string, fragmentShaderSource string) uint32 {
-	// vertex shader
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-	if err != nil {
-		panic(err)
-	}
-	// fragment shader
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-	if err != nil {
-		panic(err)
-	}
-
-	shaderProgram := gl.CreateProgram()
-
-	gl.AttachShader(shaderProgram, vertexShader)
-	gl.AttachShader(shaderProgram, fragmentShader)
-	gl.LinkProgram(shaderProgram)
-
-	var success int32
-	gl.GetProgramiv(shaderProgram, gl.LINK_STATUS, &success)
-	if success == gl.FALSE {
-		panic("could not link shader program")
-	}
-
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
-
-	return shaderProgram
-}
-
-func compileShader(source string, shaderType uint32) (uint32, error) {
-	shader := gl.CreateShader(shaderType)
-	// compile shader
-	csources, free := gl.Strs(source)
-	gl.ShaderSource(shader, 1, csources, nil)
-	gl.CompileShader(shader)
-	var status int32
-	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
-
-	// check failure and log if necessary
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
-		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
-	}
-	free()
-	return shader, nil
+	return
 }
 
 func fbcallback(w *glfw.Window, width int, height int) {
@@ -241,14 +166,4 @@ func importPathToDir(importPath string) (string, error) {
 		return "", err
 	}
 	return p.Dir, nil
-}
-
-// reads a shader from a file and returns a string representation
-// that is usable in opengl programs
-func readShaderFile(shaderPath string) (string, error) {
-	shaderBuf, err := ioutil.ReadFile(shaderPath)
-	if err != nil {
-		return "", fmt.Errorf("shader %q unable to be read: %v", shaderPath, err)
-	}
-	return string(shaderBuf), nil
 }
