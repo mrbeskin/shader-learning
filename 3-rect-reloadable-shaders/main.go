@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"go/build"
 	_ "image/png"
-	"io/ioutil"
 	"log"
 	"os"
 	"runtime"
-	"strings"
-	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -23,6 +20,12 @@ const (
 	sizeof_float32 = 4
 )
 
+var (
+	VAO uint32
+	VBO uint32
+	EBO uint32
+)
+
 func init() {
 	// GLFW event handling must run on the main OS thread
 	runtime.LockOSThread()
@@ -30,18 +33,26 @@ func init() {
 
 func main() {
 
-	initializeGlfwWindow()
-
+	window := initGlfwWindow()
 	shaders := NewShaders("shader.vert", "shader.frag")
 	program := NewProgram(shaders)
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	fmt.Println("OpenGL version", version)
+	gl.UseProgram(program.glProgram)
 	defer func() { destroyScene() }()
-
-	game := InitializeProgramWithWindow()
 
 	initBuffers()
 
-	game.Loop()
-
+	for !(window.ShouldClose()) {
+		program.UpdateShaders()
+		gl.Clear(gl.COLOR_BUFFER_BIT)
+		gl.UseProgram(program.glProgram)
+		gl.BindVertexArray(VAO)
+		gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.PtrOffset(0))
+		gl.BindVertexArray(0)
+		window.SwapBuffers()
+		glfw.PollEvents()
+	}
 }
 
 var vertices = []float32{
@@ -62,37 +73,7 @@ func destroyScene() {
 	gl.Flush()
 }
 
-type Program struct {
-	glProgram  uint32
-	glfwWindow *glfw.Window
-	glVao      uint32
-	shaders    *Shaders
-}
-
-type Shaders struct {
-	frag Shader
-	vert Shader
-}
-
-type Shader struct {
-	Modtime time.Time
-	path    string
-}
-
-func (p *Program) Loop() {
-	for !(p.glfwWindow.ShouldClose()) {
-		p.ReloadShaders()
-		gl.Clear(gl.COLOR_BUFFER_BIT)
-		gl.UseProgram(p.glProgram)
-		gl.BindVertexArray(p.glVao)
-		gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.PtrOffset(0))
-		gl.BindVertexArray(0)
-		p.glfwWindow.SwapBuffers()
-		glfw.PollEvents()
-	}
-}
-
-func intializeGlfwWindow() {
+func initGlfwWindow() *glfw.Window {
 	// initialize glfw window
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
@@ -108,24 +89,10 @@ func intializeGlfwWindow() {
 	}
 	window.MakeContextCurrent()
 	window.SetFramebufferSizeCallback(glfw.FramebufferSizeCallback(fbcallback))
+	return window
 }
 
-func InitializeProgramWithWindow() *Program {
-
-	// init Glow
-	if err := gl.Init(); err != nil {
-		panic(err)
-	}
-
-	version := gl.GoStr(gl.GetString(gl.VERSION))
-	fmt.Println("OpenGL version", version)
-
-	program := setupProgram(shaders)
-	gl.UseProgram(program)
-}
-
-func initBuffers() (VAO uint32, EBO uint32, VBO uint32) {
-
+func initBuffers() {
 	gl.GenVertexArrays(1, &VAO)
 	gl.GenBuffers(1, &VBO)
 	gl.GenBuffers(1, &EBO)
@@ -142,7 +109,6 @@ func initBuffers() (VAO uint32, EBO uint32, VBO uint32) {
 
 	gl.BindVertexArray(0)
 	gl.ClearColor(0.2, 0.3, 0.3, 1.0)
-	return
 }
 
 func fbcallback(w *glfw.Window, width int, height int) {

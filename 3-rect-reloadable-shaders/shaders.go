@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"ioutil"
+	"io/ioutil"
 	"os"
+	"time"
 )
 
 // Shaders represents the shaders used by the gl program
@@ -23,7 +24,7 @@ func NewShaders(vertPath string, fragPath string) *Shaders {
 // Shader contains a path to the shader source and a timestamp of its last
 // modification so that it may be updated
 type Shader struct {
-	Modtime time.Time
+	ModTime time.Time
 	Path    string
 }
 
@@ -33,7 +34,7 @@ func NewShader(path string) *Shader {
 	check("new shader; getting file info", err)
 	return &Shader{
 		Path:    path,
-		Modtime: fileinfo.ModTime(),
+		ModTime: fileinfo.ModTime(),
 	}
 }
 
@@ -58,9 +59,9 @@ func (ss *Shaders) GetUpdatedSource() (updated bool, vert string, frag string) {
 // Update checks if the shader can be updated and sets the latest ModTime
 // then returns a bool representing whether or not it was updated
 func (s *Shader) Update() bool {
-	fileinfo, err := os.Stat(s.path)
-	check(err)
-	if fileinfo.ModTime() > s.ModTime() {
+	fileinfo, err := os.Stat(s.Path)
+	check("stat on shader file", err)
+	if fileinfo.ModTime().After(s.ModTime) {
 		return true
 	}
 	return false
@@ -74,7 +75,7 @@ func check(msg string, err error) {
 
 // reads a shader file and returns the source
 func readShaderFile(path string) string {
-	shaderBuf, err := ioutil.ReadFile(shaderPath)
+	shaderBuf, err := ioutil.ReadFile(path)
 	check("reading shader file", err)
 	return string(shaderBuf)
 }
