@@ -70,7 +70,9 @@ func (s *Shader) Update() bool {
 // PRIVATE UTILS
 
 func check(msg string, err error) {
-	panic(fmt.Sprintf("%s; error:%v", msg, err))
+	if err != nil {
+		panic(fmt.Sprintf("%s; error:%v", msg, err))
+	}
 }
 
 // reads a shader file and returns the source

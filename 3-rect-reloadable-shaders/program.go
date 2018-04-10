@@ -12,8 +12,13 @@ type Program struct {
 }
 
 func NewProgram(shaders *Shaders) *Program {
+	if err := gl.Init(); err != nil {
+		check("initializing gl", err)
+	}
+	glP := gl.CreateProgram()
 	program := &Program{
-		shaders: shaders,
+		shaders:   shaders,
+		glProgram: glP,
 	}
 	program.LoadShaders()
 	return program
@@ -22,14 +27,14 @@ func NewProgram(shaders *Shaders) *Program {
 func (p *Program) LoadShaders() {
 	vert, frag := p.shaders.GetSource()
 	p.attachShaders(vert, frag)
+	gl.UseProgram(p.glProgram)
 }
 
 func (p *Program) UpdateShaders() {
 	updated, vert, frag := p.shaders.GetUpdatedSource()
-	//reload := false TODO: check reload logic
 	if updated {
-		gl.DeleteProgram(p.glProgram)
-		gl.Flush()
+		glP := gl.CreateProgram()
+		p.glProgram = glP
 		p.attachShaders(vert, frag)
 	}
 }
@@ -39,8 +44,6 @@ func (p *Program) attachShaders(vert string, frag string) {
 	check("attaching vertex shader", err)
 	fragmentShader, err := compileShader(frag, gl.FRAGMENT_SHADER)
 	check("attaching fragment shader", err)
-
-	p.glProgram = gl.CreateProgram()
 
 	gl.AttachShader(p.glProgram, vertexShader)
 	gl.AttachShader(p.glProgram, fragmentShader)
