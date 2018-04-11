@@ -35,25 +35,25 @@ func init() {
 func main() {
 
 	window := initGlfwWindow()
-	shaders := NewShaders("shader.vert", "shader.frag")
-	program := NewProgram(shaders)
+	if err := gl.Init(); err != nil {
+		check("initializing gl", err)
+	}
+	shader := NewShader("shader.frag", "shader.vert")
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
-	gl.UseProgram(program.glProgram)
 	defer func() { destroyScene() }()
 
 	initBuffers()
 
 	for !(window.ShouldClose()) {
 
-		program.UpdateShaders()
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		gl.UseProgram(program.glProgram)
+		gl.UseProgram(shader.ID)
 
 		timeVal := glfw.GetTime()
 		greenVal := float32(math.Sin(timeVal)/2.0 + 0.5)
-		vertexColorLocation := gl.GetUniformLocation(program.glProgram, gl.Str("newColor\x00"))
+		vertexColorLocation := gl.GetUniformLocation(shader.ID, gl.Str("newColor\x00"))
 		gl.Uniform4f(vertexColorLocation, 0.0, greenVal, 0.0, 1.0)
 
 		gl.BindVertexArray(VAO)
@@ -65,10 +65,10 @@ func main() {
 
 var vertices = []float32{
 	// indexed to be an EBO
-	0.5, 0.5, 0.0, // top right
-	0.5, -0.5, 0.0, // bottom right
-	-0.5, -0.5, 0.0, // bottom left
-	-0.5, 0.5, 0.0, // top left
+	0.5, 0.5, 0.0, 1.0, 0.0, 0.0, // top right
+	0.5, -0.5, 0.0, 0.5, 1.0, 0.0, // bottom right
+	-0.5, -0.5, 0.0, 0.0, 0.5, 1.0, // bottom left
+	-0.5, 0.5, 0.0, 1.0, 0.0, 0.5, // top left
 }
 
 var indices = []uint32{
@@ -111,8 +111,11 @@ func initBuffers() {
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*sizeof_float32, gl.Ptr(vertices), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*sizeof_float32, gl.Ptr(indices), gl.STATIC_DRAW)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 3*sizeof_float32, gl.PtrOffset(0))
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*sizeof_float32, gl.PtrOffset(0))
 	gl.EnableVertexAttribArray(0)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*sizeof_float32, gl.Ptr(indices), gl.STATIC_DRAW)
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*sizeof_float32, gl.PtrOffset(3*sizeof_float32))
+	gl.EnableVertexAttribArray(1)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.BindVertexArray(0)

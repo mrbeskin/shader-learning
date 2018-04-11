@@ -2,82 +2,75 @@ package main
 
 import (
 	"fmt"
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"io/ioutil"
-	"os"
-	"time"
+	"strings"
 )
 
-// Shaders represents the shaders used by the gl program
-type Shaders struct {
-	vert *Shader
-	frag *Shader
-}
-
-// NewShaders returns an object containing shaders from the paths listed
-func NewShaders(vertPath string, fragPath string) *Shaders {
-	return &Shaders{
-		vert: NewShader(vertPath),
-		frag: NewShader(fragPath),
-	}
-}
-
-// Shader contains a path to the shader source and a timestamp of its last
-// modification so that it may be updated
 type Shader struct {
-	ModTime time.Time
-	Path    string
+	ID uint32
 }
 
-// NewShader returns a Shader
-func NewShader(path string) *Shader {
-	fileinfo, err := os.Stat(path)
-	check("new shader; getting file info", err)
-	return &Shader{
-		Path:    path,
-		ModTime: fileinfo.ModTime(),
+func NewShader(fragPath string, vertPath string) *Shader {
+	vert := readShaderFile(vertPath)
+	frag := readShaderFile(fragPath)
+	id := gl.CreateProgram()
+	shader := &Shader{
+		ID: id,
 	}
+	shader.attachShaders(vert, frag)
+	gl.UseProgram(shader.ID)
+	return shader
 }
 
-// GetSource returns the source string for each shader
-func (ss *Shaders) GetSource() (vert string, frag string) {
-	vert = readShaderFile(ss.vert.Path)
-	frag = readShaderFile(ss.frag.Path)
-	return
-}
+func (s *Shader) attachShaders(vert string, frag string) {
+	vertexShader, err := compileShader(vert, gl.VERTEX_SHADER)
+	check("attaching vertex shader", err)
+	fragmentShader, err := compileShader(frag, gl.FRAGMENT_SHADER)
+	check("attaching fragment shader", err)
 
-// GetUpdatedSource returns the source string for each shader
-// that has been modified.
-func (ss *Shaders) GetUpdatedSource() (updated bool, vert string, frag string) {
-	if ss.vert.Update() || ss.frag.Update() {
-		updated = true
-		vert = readShaderFile(ss.vert.Path)
-		frag = readShaderFile(ss.frag.Path)
+	gl.AttachShader(s.ID, vertexShader)
+	gl.AttachShader(s.ID, fragmentShader)
+	gl.LinkProgram(s.ID)
+
+	var success int32
+	gl.GetProgramiv(s.ID, gl.LINK_STATUS, &success)
+	if success == gl.FALSE {
+		panic("could not link shader program")
 	}
-	return
+	gl.DeleteShader(vertexShader)
+	gl.DeleteShader(fragmentShader)
 }
 
-// Update checks if the shader can be updated and sets the latest ModTime
-// then returns a bool representing whether or not it was updated
-func (s *Shader) Update() bool {
-	fileinfo, err := os.Stat(s.Path)
-	check("stat on shader file", err)
-	if fileinfo.ModTime().After(s.ModTime) {
-		return true
+func compileShader(source string, shaderType uint32) (uint32, error) {
+	shader := gl.CreateShader(shaderType)
+	// compile shader
+	csources, free := gl.Strs(source)
+	defer free()
+	gl.ShaderSource(shader, 1, csources, nil)
+	gl.CompileShader(shader)
+	var status int32
+	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
+
+	// check failure and log if necessary
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
+		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
 	}
-	return false
+	return shader, nil
 }
 
-// PRIVATE UTILS
+func readShaderFile(path string) string {
+	shaderBuf, err := ioutil.ReadFile(path)
+	check("reading shader file", err)
+	return string(shaderBuf) + "\x00"
+}
 
 func check(msg string, err error) {
 	if err != nil {
 		panic(fmt.Sprintf("%s; error:%v", msg, err))
 	}
-}
-
-// reads a shader file and returns the source
-func readShaderFile(path string) string {
-	shaderBuf, err := ioutil.ReadFile(path)
-	check("reading shader file", err)
-	return string(shaderBuf) + "\x00"
 }
