@@ -79,5 +79,7 @@ func check(msg string, err error) {
 func readShaderFile(path string) string {
 	shaderBuf, err := ioutil.ReadFile(path)
 	check("reading shader file", err)
-	return string(shaderBuf)
+	code := string(shaderBuf)
+	code += "\x00"
+	return code
 }
