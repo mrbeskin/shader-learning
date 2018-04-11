@@ -62,6 +62,7 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
 	// compile shader
 	csources, free := gl.Strs(source)
+	defer free()
 	gl.ShaderSource(shader, 1, csources, nil)
 	gl.CompileShader(shader)
 	var status int32
@@ -75,6 +76,5 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
 		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
 	}
-	free()
 	return shader, nil
 }
