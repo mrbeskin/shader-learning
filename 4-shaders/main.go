@@ -49,7 +49,7 @@ func main() {
 
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		gl.UseProgram(shader.ID)
+		shader.Use()
 
 		timeVal := glfw.GetTime()
 		greenVal := float32(math.Sin(timeVal)/2.0 + 0.5)

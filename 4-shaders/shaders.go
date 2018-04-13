@@ -23,6 +23,10 @@ func NewShader(fragPath string, vertPath string) *Shader {
 	return shader
 }
 
+func (s *Shader) Use() {
+	gl.UseProgram(s.ID)
+}
+
 func (s *Shader) attachShaders(vert string, frag string) {
 	vertexShader, err := compileShader(vert, gl.VERTEX_SHADER)
 	check("attaching vertex shader", err)
