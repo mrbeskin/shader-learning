@@ -43,14 +43,24 @@ func main() {
 	defer func() { destroyScene() }()
 
 	initBuffers()
-	tx := NewTexture("wall.jpg")
+	gl.ActiveTexture(gl.TEXTURE0)
+	tx1 := NewTexture("container.jpg")
+	tx2 := NewTexture("awesomeface.png")
+
+	shader.Use()
+	gl.Uniform1i(gl.GetUniformLocation(tx1.ID, gl.Str("texture1\x00")), 0)
+	shader.SetInt("texture2\x00", 1)
+
 	for !(window.ShouldClose()) {
 
 		gl.ClearColor(0.2, 0.3, 0.3, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
 		gl.ActiveTexture(gl.TEXTURE0)
-		gl.BindTexture(gl.TEXTURE_2D, tx.ID)
+		gl.BindTexture(gl.TEXTURE_2D, tx1.ID)
+
+		gl.ActiveTexture(gl.TEXTURE1)
+		gl.BindTexture(gl.TEXTURE_2D, tx2.ID)
 
 		shader.Use()
 		gl.BindVertexArray(VAO)
@@ -129,7 +139,7 @@ func fbcallback(w *glfw.Window, width int, height int) {
 }
 
 func init() {
-	dir, err := importPathToDir("github.com/mrbeskin/shader-learning/5-textures")
+	dir, err := importPathToDir("github.com/mrbeskin/shader-learning/5-textures-pt2")
 	if err != nil {
 		log.Fatalln("could not locate assets on GOPATH:", err)
 	}

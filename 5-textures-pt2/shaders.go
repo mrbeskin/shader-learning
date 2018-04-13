@@ -27,6 +27,10 @@ func (s *Shader) Use() {
 	gl.UseProgram(s.ID)
 }
 
+func (s *Shader) SetInt(name string, value int32) {
+	gl.Uniform1i(gl.GetUniformLocation(s.ID, gl.Str(name)), value)
+}
+
 func (s *Shader) attachShaders(vert string, frag string) {
 	vertexShader, err := compileShader(vert, gl.VERTEX_SHADER)
 	check("attaching vertex shader", err)

@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/draw"
 	_ "image/jpeg"
+	_ "image/png"
 	"os"
 )
 
@@ -31,7 +32,6 @@ func NewTexture(path string) *Texture {
 
 	var id uint32
 	gl.GenTextures(1, &id)
-	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, id)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
